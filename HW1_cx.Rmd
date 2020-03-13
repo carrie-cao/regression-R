@@ -1,0 +1,247 @@
+---
+title: "HW1 Peer Assessment"
+author: "Chunxia Cao"
+date: "Jan 15, 2020"
+output:  pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Part A. ANOVA
+
+Additional Material: ANOVA tutorial
+
+https://datascienceplus.com/one-way-anova-in-r/
+
+Jet lag is a common problem for people traveling across multiple time zones, but people can gradually adjust to the new time zone since the exposure of the shifted light schedule to their eyes can resets the internal circadian rhythm in a process called “phase shift”. Campbell and Murphy (1998) in a highly controversial study reported that the human circadian clock can also be reset by only exposing the back of the knee to light, with some hailing this as a major discovery and others challenging aspects of the experimental design. The table below is taken from a later experiment by Wright and Czeisler (2002) that re-examined the phenomenon. The new experiment measured circadian rhythm through the daily cycle of melatonin production in 22 subjects randomly assigned to one of three light treatments. Subjects were woken from sleep and for three hours were exposed to bright lights applied to the eyes only, to the knees only or to neither (control group). The effects of treatment to the circadian rhythm were measured two days later by the magnitude of phase shift (measured in hours) in each subject’s daily cycle of melatonin production. A negative measurement indicates a delay in melatonin production, a predicted effect of light treatment, while a positive number indicates an advance.
+
+Raw data of phase shift, in hours, for the circadian rhythm experiment
+
+|Treatment|Phase Shift (hr)                            |
+|:--------|:-------------------------------------------|
+|Control  |0.53, 0.36, 0.20, -0.37, -0.60, -0.64, -0.68, -1.27|
+|Knees    |0.73, 0.31, 0.03, -0.29, -0.56, -0.96, -1.61       |
+|Eyes     |-0.78, -0.86, -1.35, -1.48, -1.52, -2.04, -2.83    |
+
+## Question A1 - 7 pts
+
+Consider the following incomplete R output:
+
+|Source|Df |Sum of Squares|Mean Squares|F-statistics|p-value|
+|:----:|:-:|:------------:|:----------:|:----------:|:-----:|
+|Treatments|?|?|3.6122|?|0.004|
+|Error|?|9.415|?| | |
+|TOTAL|?|?| | | |
+
+Fill in the missing values in the analysis of the variance table.
+```{r warning=FALSE, message=FALSE}
+library(reshape2)
+library(dplyr)
+#dataframe, NA: missing value in knees and eyes;
+Control = c(0.53, 0.36, 0.20, -0.37, -0.60, -0.64, -0.68, -1.27)
+Knees = c(0.73, 0.31, 0.03, -0.29, -0.56, -0.96, -1.61, NA)
+Eyes = c(-0.78, -0.86, -1.35, -1.48, -1.52, -2.04, -2.83, NA)
+dataA = data.frame(cbind(Control,Knees, Eyes))%>%melt()
+colnames(dataA) = c('Treatments', 'PhaseShift')
+model = aov(dataA$`PhaseShift`~dataA$Treatments)
+summary(model)
+
+```
+
+
+
+|Source|Df |Sum of Squares|Mean Squares|F-statistics|p-value|
+|:----:|:-:|:------------:|:----------:|:----------:|:-----:|
+|Treatments|2|7.224|3.6122|7.289|0.004|
+|Error|19|9.415|0.496| | |
+|TOTAL|21|16.639| | | |
+
+
+
+## Question A2 - 3 pts
+
+Use $\mu_1$, $\mu_2$, and $\mu_3$  as notation for the three mean parameters and define these parameters clearly based on the context of the topic above. Find the estimates of these parameters.
+```{r}
+x = model.tables(model, type = 'mean')
+u1 = x$tables$`dataA$Treatments`[1]
+u2 = x$tables$`dataA$Treatments`[2]
+u3 = x$tables$`dataA$Treatments`[3]
+print(x)
+
+```
+
+$\mu_1$ is the the mean phase shift of Control group, $\mu_1$ =-0.3087; 
+$\mu_2$ is the mean of Knees group, $\mu_2$=-0.3357 
+$\mu_3$ is the mean of Eyes group, $\mu_3$= -1.551
+
+
+## Question A3 - 10 pts
+
+Use the ANOVA table in Question A1 to write the:
+
+a. **2 pts** Write the null hypothesis of the ANOVA $F$-test, $H_0$
+
+null hypothesis $H_0$ is: all three populations have equal means,
+$H_0$: $\mu_1$ = $\mu_2$ = $\mu_3$ 
+
+b. **2 pts** Write the alternative hypothesis of the ANOVA $F$-test, $H_A$
+
+alternative hypothesis $H_A$ is:
+$H_A$: the population means are not all equal
+
+c. **2 pts** Fill in the blanks for the degrees of freedom of the ANOVA $F$-test statistic:   
+## $F$(__2__, __19__)
+
+d. **2 pts** What is the p-value of the ANOVA $F$-test?
+
+The p-value of the ANOVA $F$-test is **0.00447**, reject $H_0$ at $\alpha$-value of 0.05. We can conclude that the population means are not all equal.
+
+e. **2 pts** According the the results of the ANOVA $F$-test, does light treatment affect phase shift?  Use an $\alpha$-value of 0.05.
+
+Since the $F$-test statistic has an $F$ statistic: 7.289. p-value of the ANOVA $F$-test is **0.00447**, reject $H_0$ at $\alpha$-value of 0.05. we can conclude that light treatment does affect phase shift.
+```{r}
+TukeyHSD(x = model, conf.level = 0.95)
+```
+
+By the pairwise comparison, compare to control, light treatment on eyes can affect the phase shift,but light treatment on knees can not affect phase shift.
+
+# Part B. Simple Linear Regression
+
+Additional Material: Simple Linear Regression tutorial (8 modules)
+
+http://www.r-tutor.com/elementary-statistics/simple-linear-regression
+
+It is common knowledge that obeying the traffic signs while driving reduces the number of accidents on the road. Is the previous really true? If it is, the more signs the safer the highway? In this problem we will analyze data from 39 sections of large highways in Minnesota in 1973 to try to give answers to these questions.
+
+The data file includes the following columns:
+
+_rate_: 1973 accident rate per million vehicle miles.
+
+_sigs1_: signs per mile of roadway, adjusted to have no zero values.
+
+The data is in the file "Highway.csv". To read the data in `R`, save the file in your working directory (make sure you have changed the directory if different from the R working directory) and read the data using the `R` function `read.csv()`, and we will extract the variables of interest into two vectors.
+
+```{r}
+# Read in the data
+data = read.csv("Highway.csv", head = TRUE, sep = ",")
+# Extract the predictor and response variables
+rate = as.numeric(data[,2])
+signs = as.numeric(data[,6])
+```
+
+## Question B1: Exploratory Data Analysis - 8 pts
+
+a. **2 pts** Use a scatter plot to describe the relationship between the rate of accidents and the number of signs. Describe the general trend (direction and form). Include plots and R-code used.
+
+```{r}
+# Your code here...
+plot(signs, rate) #scatterplot
+```
+
+From the scatter plot we can see that there is a slight positive (might be linear) relationship between the two variables.
+
+
+b. **2 pts** What is the value of the correlation coefficient? (Use the cor() function in R with the two input variables (signs,rate)). Please interpret.  Interpret the strength of the correlation based on the correlation coefficient.
+
+```{r}
+# Your code here...
+cor(signs, rate) #computes correlation
+```
+
+the correlation coefficient between the two variables is 0.5829072,  which can be interpreted that the variables are positively correlated.
+
+c. **2 pts** Based on this exploratory analysis, is it reasonable to assume a simple linear regression model for the relationship between rate of accidents and the number of signs?
+
+The scatter plot and the correlation coefficient between the two variables supports our hypothesis that the variables are positively correlated.Thus, we can assume a linear relationship between the two variables. 
+
+d. **2 pts** Based on the analysis above, would you pursue a transformation of the data?
+
+The scatter plot and the correlation coefficient supports othat the variables are positively correlated.Thus, we can assume a linear relationship between the two variables. Therefore we will fit a simple linear regression model without transforming the data.
+
+## Question B2: Fitting the Simple Linear Regression Model - 12 pts
+
+Fit a linear regression model to evaluate the relationship between the rate of accidents and the number of signs. Do not transform the data. The function you should use in R is:
+
+```{r}
+# Create the model
+model = lm(rate ~ signs)
+summary(model)
+```
+
+a. **3 pts** What are the model parameters and what are their estimates?  
+
+The estimate for intercept $\beta_0$ is 2.9310, the estimate for the slope $\beta_1$ is 1.8021, the estimate for error term is 1.635^2^, or 2.673225
+
+b. **3 pts** Write down the equation for the simple linear regression model.
+
+The equation is: rate=2.9310+1.8021*signs
+
+c. **3 pts** Interpret the estimated value of the $\beta_1$ parameter in the context of the problem. Include its standard error in your interpretation.
+
+The estimate of $\beta_1$ is 1.8021, which means, an increase in one signal per mile of roadway increases the acident rate by 1.8021 units with a stand error of 0.4130.
+
+d. **3 pts** Find a 95% confidence interval for the $\beta_1$ parameter. Is $\beta_1$ statistically significant at this level?
+```{r}
+confint(model, level=.95)
+```
+
+The result from the 95% CI is (0.9653151, 2.638810). Since 0 is not included in the CI we can conclude that the explanatory variable **signs** is statistically significant at the significance level $\alpha$ = 0.05.
+
+## Question B3: Checking the Assumptions of the Model - 16 pts
+
+Interpret the following graphs with respect to the assumptions of the linear regression model. In other words, comment on whether there are any apparent departures from the assumptions of the linear regression model. Make sure that you state the model assumptions and assess each one.  Each graph may be used to assess one or more model assumptions.
+
+a. Scatterplot of the data with signs on the x-axis and rate on the y-axis
+
+```{r}
+# Your code here...
+plot(signs, rate)
+
+```
+
+**Model Assumption(s) it checks:** 
+the data shows a slight linear relationship and that there are no obvious outliers
+
+**Interpretation:** 
+the data shows a slight linear relationship and  no obvious outliers
+
+b. Residual plot - a plot of the residuals, $\epsilon_i$, versus, $\hat{y}_i$
+
+```{r}
+# Your code here...
+plot (fitted(model), resid(model))
+```
+
+**Model Assumption(s) it checks:** 
+From the residual plot, there is a cluster of points under the zero line on the left, and as we move to the right the residuals seem to be further away from 0.
+
+**Interpretation:**
+
+The result suggests that there is some heteroscedasticity (non-constant variance) in the residuals. Due to the nature of this clusterof points together in the lower left corner, we may also see that there are problems with the independence assumption.
+
+c. q-q plot
+
+```{r}
+# Your code here...
+qqnorm(resid(model))
+qqline(resid(model))
+```
+
+**Model Assumption(s) it checks:**
+qq-plot has an S-shape, especially on the upper tail.
+
+**Interpretation:**
+
+This might suggest that the error term is not normally distributed.
+
+## Question B4: Prediction - 4 pts
+
+Suppose we are interested in predicting future accident rates when `signs = 1.25`.  Please make a prediction and provide the 95% prediction interval. What observations can you make about the result?
+
+```{r}
+# Your code here...
+predict(model, data.frame(signs=1.25), interval="prediction")
+```
+The point prediction is 5.183579, the 95% prediction interval is(1.77789, 8.589268)

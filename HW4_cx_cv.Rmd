@@ -1,0 +1,402 @@
+---
+title: "HW4 Peer Assessment"
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(tinytex.verbose = TRUE)
+```
+
+## Background
+
+The dataset contains modified cases from a study that was conducted between 1958 and 1970 at the University of Chicago's Billings Hospital on the survival of patients who had undergone surgery for breast cancer. 
+
+## Data Description
+It contains the following variables:
+
+Age: Age of patient at time of operation (numerical)
+OperationYear: Patient's year of operation (year - 1900, numerical)
+NodeCount: Number of positive axillary nodes detected (numerical)
+Patients: Total number of patients
+Survived: Number of patients that survived 5 years or longer
+
+
+## Read the data
+
+```{r}
+data = read.csv("breast_cancer_v2.csv", header=TRUE)
+data$Survival = data$Survived / data$Patients
+colnames(data)[1] = "Age"
+head(data,2)
+```
+
+## Question 1: Fitting a Model 
+Fit a logistic regression model using Survival as the response variable with NodeCount as the predictor and logit as the link function. Call it model1.
+
+(a) Display the summary of model1. What are the model parameters and estimates?
+```{r}
+## Model 1:Survival~ NodeCount logit
+model1 = glm(Survival~ NodeCount, weights=Patients, family=binomial,data=data)
+summary(model1)
+```
+
+#The summary of model1 is shown above. Two parameters are: The estimate for intercept $\hat{\beta_0}$ is 0.509155, the estimate for the  $\hat{\beta_1}$ is -0.045828.
+
+(b) Write down the equation for the Odds of Survival.
+
+#the equation for the Odds of Survival is: the Odds of Survival = $e^{0.509155-0.045828*NodeCount}$
+
+(c) Provide a meaningful interpretation for the coefficient for NodeCount with respect to the log-odds of survival and  the odds of survival.
+```{r}
+exp(coef(model1)[-1])
+```
+#Interpretation: As $\hat{\beta_1}=-0.045828$, For NodeCount increase 1 unit, the log odds of survival decreases by .045828 OR the odds of survival decrease by 0.9552065. 
+
+
+
+## Question 2: Inference 
+(a) Using model1, find a 90% confidence interval for the coefficient for NodeCount.
+```{r,message=FALSE}
+confint(model1, 'NodeCount', level=0.90)
+```
+#the 90% confidence interval for the coefficient for NodeCount is [-0.05162418, -0.04010638]
+
+(b) Is model1 significant overall? How do you come to your conclusion?
+```{r}
+## Test for overall regression
+gstat = model1$null.deviance - deviance(model1)
+cbind(gstat, 1-pchisq(gstat,length(coef(model1))-1))
+# or the following code:
+1-pchisq(model1$dev,model1$df.residual)
+```
+#The model1 is significant overall. Since Null deviance -Residual Deviance =  186.6847, with the p-value=P($\chi_1$>186.6847) $\approx$ 0. The p value is very small, therefore, we reject null hypothesis, we can conclude that at least one coefficent is not equal to zero, therefore, model1 is significant overall.
+
+
+
+(c) Which variables are significantly nonzero at the 0.01 significance level? Which are significantly negative? Why?
+```{r,message=FALSE}
+# Extract parameters
+model1$coef
+# Extract P-values
+p_values <- summary(model1)$coef[,4]
+alpha <- 0.01
+p_values <= alpha
+confint(model1, level=0.99)
+pnorm((-0.045828-0)/0.003501)
+```
+#By the summary of model1, and the above output, both intercept and predictor NodeCount are non-zero at the 0.01 significance level. 
+#By the 99% confidence interval, the NodeCount is significant negative since there's no zero in the interval, the upper limit is below zero.
+# also for the Hypothesis test: 
+$H_0: \beta_1\ge 0$
+$H_a: \beta_1< 0$
+The z test get very small p value of 1.878675e-39, which reject $H_a$ at 0.01 significance level.Therefore, we accept that the NodeCount is significant negative.
+
+## Question 3: Goodness of fit 
+(a) Perform goodness of fit hypothesis tests using both deviance and Pearson residuals. What do you conclude? Explain the differences, if any, between these findings and what you found in Question 2b.
+
+```{r}
+## Test for GOF: Using deviance residuals
+
+deviances1 = residuals(model1,type="deviance")
+dev.tvalue = sum(deviances1^2)
+c(dev.tvalue, 1-pchisq(dev.tvalue,model1$df.residual))
+#OR
+c(deviance(model1), 1-pchisq(deviance(model1),model1$df.residual))
+
+## Test for GOF: Using Person residuals
+pearres1 = residuals(model1,type="pearson")
+pearson.tvalue = sum(pearres1^2)
+c(pearson.tvalue, 1-pchisq(pearson.tvalue,model1$df.residual))
+```
+#Test for goodness-of-fit: Using deviance residuals, p-value $\approx$ 0; Using Pearson residual: p-value $\approx$ 0. Thus we reject the null hypothesis of good fit. Therefore, the logistic model does not fit the data.
+
+#The deviance residuals are the signed square root of the log-likelihood evaluated at the saturated model vs. the fitted model.Pearson’s residuals follow directly a normal approximation to a binomial.
+
+#Since the model is not a good fit, we are doubt of the result get in Question 2b. Further study need to be performed. 
+
+(b) Perform visual analytics for checking goodness of fit for this model and write your observations. Be sure to address the model assumptions. Only deviance residuals are required for this question.
+```{r}
+plot( data$NodeCount,log((data$Survival)/(1-data$Survival)), ylab="Logit of survival",
+     main="logit survival rate vs NodeCount", col=c("red","blue"),lwd=3)
+```
+
+#Assumption:  Linearity Assumptions. By the plot, The relationship between the logit of survival and NodeCount is not linear.
+
+```{r}
+## Residual Analysis
+res = resid(model1,type="deviance")
+par(mfrow=c(2,2))
+plot(data$NodeCount,res,ylab="residuals",xlab="NodeCount")
+abline(0,0,col="blue",lwd=2)
+boxplot(res~data$NodeCount,ylab = "residuals")
+qqnorm(res, ylab="residuals")
+qqline(res,col="blue",lwd=2)
+hist(res,10,xlab="residuals", main="")
+```
+  
+#Assumption:  Linearity & Independence Assumptions.  From the above scatter plot and boxplot of Residuals vs predictor, Residuals form a pattern while the NodeCound increase, Heteroscedasticity exists. The Linearity & Independence Assumptions are not hold. 
+
+#Assumption: Normal Assumptions. From the bottom QQ plot and hisgram, residuals are largely standard normally distributed.
+
+(c) Calculate the dispersion parameter for this model. Is this an overdispersed model?
+```{r}
+dev.tvalue/(152-2) 
+#or
+model1$dev/model1$df.residual
+```
+#Given the Overdispertion Parameter: $\phi$, the Estimate: $\hat\phi$ = $\frac{D}{(n-p-1)}$ where D is the sum of the squared deviances. Since $\hat\phi$=19.36509 > 2, we conclude that this is an overdispersed model
+
+## Question 4: Fitting the full model 
+Fit a logistic regression model using Survival as the response variable with Age, OperationYear, and NodeCount as the predictors and logit as the link function. Call it model2.
+```{r}
+## Model 2:
+model2 = glm(Survival~ Age+OperationYear+NodeCount, weights=Patients, family=binomial,data=data)
+summary(model2)
+```
+
+
+(a) Write down the equation for the probability of Survival.
+
+#the equation for the probability of Survival is:
+
+p(Survival)=
+
+($e^{2.182-0.046*Age+0.012*OperationYear-0.053*NodeCount}$)/(1+$e^{2.182-0.046*Age+0.012*OperationYear-0.053*NodeCount}$)
+
+(b) Provide a meaningful interpretation for the coefficients of Age and OperationYear with respect the to the odds of survival.
+```{r}
+exp(coef(model2)[-1])
+```
+#Interpretation: As $\hat{\beta_{Age}}=-0.045833$, Assume other predictors hold, for Age increases 1 unit, the odds of survival decrease by 0.9552012.  
+
+#As $\hat{\beta_{operationyear}}=0.011898$, Assume other predictors hold, for OperationYear increases 1 unit, the odds of survival increase by 1.0119686. 
+
+(c) Is OperationYear significant given the other variables in model2?
+
+#From the summary of model2, the give the  p-value=0.128, we failed to reject null hypothesis at 0.05 level. We can not conclude that the OperationYear is significant given the other variables in model2.
+
+(d) Has your goodness of fit been affected? Repeat the tests, plots, and dispersion parameter calculation you performed in Question 3 with model2.
+```{r}
+## Test for GOF: Using deviance residuals
+deviances2 = residuals(model2,type="deviance")
+dev.tvalue2 = sum(deviances2^2)
+c(dev.tvalue2, 1-pchisq(dev.tvalue2,148))
+#OR
+c(deviance(model2), 1-pchisq(deviance(model2),148))
+## Test for GOF: Using Person residuals
+pearres2 = residuals(model2,type="pearson")
+pearson.tvalue2 = sum(pearres2^2)
+c(pearson.tvalue2, 1-pchisq(pearson.tvalue2,148))
+```
+
+#Test for goodness-of-fit: Using deviance residuals, p-value $\approx$ 0; Using Pearson residual: p-value $\approx$ 0. Thus we reject the null hypothesis of good fit. Therefore, the logistic model does not fit the data well.
+
+```{r}
+par(mfrow=c(1,3))
+plot( data$Age,log((data$Survival)/(1-data$Survival)), ylab="Logit of survival",
+     main="logit survival vs Age", col=c("red","blue"),lwd=3)
+plot( data$OperationYear,log((data$Survival)/(1-data$Survival)), ylab="Logit of survival",
+     main="logit survival vs OperationYear", col=c("red","blue"),lwd=3)
+plot( data$NodeCount,log((data$Survival)/(1-data$Survival)), ylab="Logit of survival",
+     main="logit survival vs NodeCount", col=c("red","blue"),lwd=3)
+```
+#Linearity Assumptions.  From the above scatter plots, the relationship between the logit of survival with the predictors, Age, OperationYear and NodeCount are not linear. 
+
+```{r}
+## Residual Analysis
+res = resid(model2,type="deviance")
+par(mfrow=c(1,2))
+qqnorm(res, ylab="residuals")
+qqline(res,col="blue",lwd=2)
+hist(res,10,xlab="residuals", main="")
+```
+
+#Assumption: Normal Assumptions. From the bottom QQ plot and hisgram, Residuals is largely standard normally distributed.
+
+
+
+```{r}
+par(mfrow=c(3,2))
+plot(data$Age,res,ylab="residuals",xlab="Age")
+abline(0,0,col="blue",lwd=2)
+boxplot(res~data$Age,ylab = "residuals")
+
+plot(data$OperationYear,res,ylab="residuals",xlab="OperationYear")
+abline(0,0,col="blue",lwd=2)
+boxplot(res~data$OperationYear,ylab = "residuals")
+
+plot(data$NodeCount,res,ylab="residuals",xlab="NodeCount")
+abline(0,0,col="blue",lwd=2)
+boxplot(res~data$NodeCount,ylab = "residuals")
+```
+
+#Assumption:  Linearity & Independence Assumptions.
+
+#From the above scatter plot and boxplot of Residuals vs predictors, The Residuals vs Age shows kind of linearity and Independence.
+
+#However, Residuals form  patterns while VS the predictors OperationYear and NodeCount, therefore, Heteroscedasticity exist. the Linearity & Independence Assumptions do not hold for this two variables.
+
+```{r}
+#Overdispertion
+model2$dev/model2$df.residual
+```
+
+#Given the Overdispertion Parameter: $\phi$, the Estimate: $\hat\phi$ = $\frac{D}{(n-p-1)}$ where D is the sum of the squared deviances. Since $\hat\phi$=16.83309 > 2, we conclude that this is an overdispersed model
+
+
+(e) Overall, would you say model2 is a good-fitting model? If so, why? If not, what would you suggest to improve the fit and why? Note, we are not asking you to spend hours finding the best possible model but to offer plausible suggestions along with your reasoning.
+
+#We do note that the model2 still does not fit well. Given the good of fit test has been rejected. 
+
+#This probably because of the linearity and independence assumptions have been violated for OperationYear and NodeCount, and the overdispersion issue. 
+
+#Suggestion: probably entering OperationYear into the model as a categorical (factor) variable, rather than as a numerical one; this allows for any relationship with OperationYear. Also, a transformation of NodeCount probably will also increase the Linearity, thus will improve the model fit.
+
+#Since OperationYear is not significant in the model, another suggestion is probably we can remove this variable from model.
+
+
+## Question 5: Prediction 
+Suppose a 31-year-old individual with 3 nodes is operated on in 1970.
+
+(a) Predict their probability of survival using model1.
+
+```{r}
+# Predict probability of survival using model1 
+newdata = data.frame(Age=31, OperationYear=70, NodeCount=3)
+predict.glm(model1,newdata,type="response")
+```
+
+#Predict probability of survival using model1 is 0.5918628
+
+(b) Predict their probability of survival using model2.
+
+```{r}
+#Predict probability of survival using model2
+predict.glm(model2,newdata,type="response")
+
+```
+
+#Predict probability of survival using model2 is 0.8075187 
+
+(c) Comment on how your predictions compare.
+```{r}
+data[with(data, 35>=Age&Age>=25), ]
+mean(data[with(data, 35>=Age&Age>=25), ]$Survival)
+```
+
+#Since the OperationYear is not significant in the model, and the NodeCount is suspicious in model prediction because of the violation of multiple assumptions, I choose the Age as criteria to check the data. The mean survival around Age 31(25-35) is 0.829461, which is closer to the predict probability of model2, and far away from the predict probability of model1 which is 0.5918628, therefore, the model2 is a little bit better in prediction. However, further study needed to be applied for a better fit of the model.
+
+#The logistic model is not necessarily appropriate for a particular data set. This is not the same thing as saying that the predicting variables are not good predictors for the probability of success.Sometimes, the predicting variables predict the data even if the one or more assumptions do not hold.
+
+#When we use cross-validation to check the classification error for the model1 and model2, the minimal classification error is  0.415855 and 0.3580101 for model1 and model2 at  threshold of 0.50, the mean error for model1 and model2 are 0.432921 and 0.3931034. These all indicate that probably model2 is better in prediction than model1.
+
+```{r}
+##  classification error for 10-fold cross-validation for model1
+set.seed(123)
+library(boot)
+##
+cost0.5 = function(y, pi){
+ ypred=rep(0,length(y))
+ ypred[pi>0.5] = 1
+ err = mean(abs(y-ypred))
+ return(err)
+}
+n = length(data)
+
+## classification error for 10-fold cross-validation
+cv.err = cv.glm(data,model1,cost=cost0.5, K=10)$delta[1]
+
+## Consider different thresholds for the probability
+
+cost0.3 = function(y, pi){
+ ypred=rep(0,length(y))
+ ypred[pi>0.3] = 1
+ err = mean(abs(y-ypred))
+ return(err)
+}
+
+cost0.35 = function(y, pi){
+ ypred=rep(0,length(y))
+ ypred[pi>0.35] = 1
+ err = mean(abs(y-ypred))
+ return(err)
+}
+
+cost0.4 = function(y, pi){
+ ypred=rep(0,length(y))
+ ypred[pi>0.4] = 1
+ err = mean(abs(y-ypred))
+ return(err)
+}
+
+cost0.45 = function(y, pi){
+ ypred=rep(0,length(y))
+ ypred[pi>0.45] = 1
+ err = mean(abs(y-ypred))
+ return(err)
+}
+
+
+cost0.55 = function(y, pi){
+ ypred=rep(0,length(y))
+ ypred[pi>0.55] = 1
+ err = mean(abs(y-ypred))
+ return(err)
+}
+cost0.6 = function(y, pi){
+ ypred=rep(0,length(y))
+ ypred[pi>0.6] = 1
+ err = mean(abs(y-ypred))
+ return(err)
+}
+cost0.65 = function(y, pi){
+ ypred=rep(0,length(y))
+ ypred[pi>0.65] = 1
+ err = mean(abs(y-ypred))
+ return(err)
+}
+
+cv.err0.3 = cv.glm(data,model1,cost=cost0.3,K=10)$delta[1]
+cv.err0.35 = cv.glm(data,model1,cost=cost0.35,K=10)$delta[1]
+cv.err0.4 = cv.glm(data,model1,cost=cost0.4,K=10)$delta[1]
+cv.err0.45 = cv.glm(data,model1,cost=cost0.45,K=10)$delta[1]
+cv.err0.5 = cv.glm(data,model1,cost=cost0.5,K=10)$delta[1]
+cv.err0.55 = cv.glm(data,model1,cost=cost0.55,K=10)$delta[1]
+cv.err0.6 = cv.glm(data,model1,cost=cost0.6,K=10)$delta[1]
+cv.err0.65 = cv.glm(data,model1,cost=cost0.6,K=10)$delta[1]
+cv.err = c(cv.err0.35,cv.err0.35,cv.err0.4,cv.err0.45,cv.err0.5,
+           cv.err0.55,cv.err0.6,cv.err0.65)
+mean(cv.err)
+min(cv.err)
+## Smallest prediction error is 0.415855 at 0.50
+plot(c(0.3, 0.35,0.4,0.45,0.5,0.55,0.6,0.65),cv.err,
+     type="l",lwd=3,xlab="Threshold",ylab="CV Classification Error")
+
+```
+
+```{r}
+## classification error for 10-fold cross-validation for model2
+
+set.seed(123)
+cv.err = cv.glm(data,model2,cost=cost0.5, K=10)$delta[1]
+cv.err0.3 = cv.glm(data,model2,cost=cost0.3,K=10)$delta[1]
+cv.err0.35 = cv.glm(data,model2,cost=cost0.35,K=10)$delta[1]
+cv.err0.4 = cv.glm(data,model2,cost=cost0.4,K=10)$delta[1]
+cv.err0.45 = cv.glm(data,model2,cost=cost0.45,K=10)$delta[1]
+cv.err0.5 = cv.glm(data,model2,cost=cost0.5,K=10)$delta[1]
+cv.err0.55 = cv.glm(data,model2,cost=cost0.55,K=10)$delta[1]
+cv.err0.6 = cv.glm(data,model2,cost=cost0.6,K=10)$delta[1]
+cv.err0.65 = cv.glm(data,model2,cost=cost0.6,K=10)$delta[1]
+cv.err = c(cv.err0.35,cv.err0.35,cv.err0.4,cv.err0.45,cv.err0.5,
+           cv.err0.55,cv.err0.6,cv.err0.65)
+mean(cv.err)
+min(cv.err)
+## Smallest prediction error is 0.3580101 at 0.50
+plot(c(0.3, 0.35,0.4,0.45,0.5,0.55,0.6,0.65),cv.err,
+     type="l",lwd=3,xlab="Threshold",ylab="CV Classification Error")
+```
+
